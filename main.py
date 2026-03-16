@@ -12,6 +12,7 @@ app = FastAPI()
 
 VK_TOKEN = os.getenv("VK_TOKEN")
 VK_USER_ID = os.getenv("VK_USER_ID")
+VK_CHAT_PEER_ID = os.getenv("VK_CHAT_PEER_ID")
 
 PAYMENT_METHODS = {
     "cash": "Наличные",
@@ -25,16 +26,13 @@ PAYMENT_METHODS = {
 }
 
 def clean_address(address: str) -> str:
-    """Убирает 'RU: ' и форматирует адрес"""
     address = re.sub(r'^RU:\s*', '', address)
-    # Разбиваем Point: ... на отдельные строки
     address = address.replace("Point: ", "")
     return address.strip()
 
 def format_message(data: dict) -> str:
     lines = []
 
-    # Парсим payment JSON
     payment_raw = data.get("payment", "{}")
     try:
         payment = json.loads(payment_raw)
@@ -44,7 +42,6 @@ def format_message(data: dict) -> str:
     order_id = payment.get("orderid", "—")
     lines.append(f"🛍 Новый заказ #{order_id}\n")
 
-    # Контакты — берём из payment если есть, иначе из формы
     name = payment.get("delivery_fio") or data.get("Name") or data.get("ma_name", "—")
     phone = data.get("Phone", "—")
     email = data.get("Email") or data.get("ma_email", "—")
@@ -53,7 +50,6 @@ def format_message(data: dict) -> str:
     lines.append(f"📞 {phone}")
     lines.append(f"✉️ {email}\n")
 
-    # Товары
     products = payment.get("products", [])
     if products:
         lines.append("🛒 Товары")
@@ -65,7 +61,6 @@ def format_message(data: dict) -> str:
             except Exception:
                 lines.append(f"• {product}")
 
-    # Суммы
     subtotal = payment.get("subtotal", "")
     delivery_price = payment.get("delivery_price", 0)
     amount = payment.get("amount", "—")
@@ -78,14 +73,11 @@ def format_message(data: dict) -> str:
     else:
         lines.append(f"💰 Сумма: {amount} руб.")
 
-    # Способ оплаты
     pay_method = data.get("paymentsystem", "—")
     pay_label = PAYMENT_METHODS.get(pay_method, pay_method)
     lines.append(f"💳 Оплата: {pay_label}")
 
-    # Доставка
     delivery = payment.get("delivery", "")
-    city = payment.get("delivery_city", "")
     address = payment.get("delivery_address", "")
     comment = payment.get("delivery_comment", "")
 
@@ -94,10 +86,7 @@ def format_message(data: dict) -> str:
         lines.append(delivery)
         if address:
             lines.append(clean_address(address))
-        elif city:
-            lines.append(city)
 
-    # Комментарий
     if comment:
         lines.append(f"\n💬 Комментарий")
         lines.append(comment)
@@ -105,12 +94,12 @@ def format_message(data: dict) -> str:
     return "\n".join(lines)
 
 
-def send_vk_message(text: str):
+def send_vk_message(peer_id: str, text: str):
     url = "https://api.vk.com/method/messages.send"
     params = {
         "access_token": VK_TOKEN,
         "v": "5.131",
-        "user_id": VK_USER_ID,
+        "peer_id": peer_id,
         "message": text,
         "random_id": random.randint(1, 10**9),
     }
@@ -123,5 +112,15 @@ async def tilda_webhook(request: Request):
     data = await request.form()
     data = dict(data)
     message = format_message(data)
-    result = send_vk_message(message)
-    return {"status": "ok", "vk_response": result}
+
+    results = {}
+
+    # Отправляем в личку администратору
+    if VK_USER_ID:
+        results["personal"] = send_vk_message(VK_USER_ID, message)
+
+    # Отправляем в чат сотрудников
+    if VK_CHAT_PEER_ID:
+        results["chat"] = send_vk_message(VK_CHAT_PEER_ID, message)
+
+    return {"status": "ok", "vk_response": results}

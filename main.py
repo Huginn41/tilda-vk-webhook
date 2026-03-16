@@ -11,8 +11,7 @@ load_dotenv()
 app = FastAPI()
 
 VK_TOKEN = os.getenv("VK_TOKEN")
-VK_USER_ID = os.getenv("VK_USER_ID")
-VK_CHAT_PEER_ID = os.getenv("VK_CHAT_PEER_ID")
+VK_RECIPIENTS = os.getenv("VK_RECIPIENTS", "")
 
 PAYMENT_METHODS = {
     "cash": "Наличные",
@@ -24,6 +23,9 @@ PAYMENT_METHODS = {
     "yookassa": "ЮКасса",
     "robokassa": "Robokassa",
 }
+
+def get_recipients():
+    return [int(uid.strip()) for uid in VK_RECIPIENTS.split(",") if uid.strip()]
 
 def clean_address(address: str) -> str:
     address = re.sub(r'^RU:\s*', '', address)
@@ -94,7 +96,7 @@ def format_message(data: dict) -> str:
     return "\n".join(lines)
 
 
-def send_vk_message(peer_id: str, text: str):
+def send_vk_message(peer_id: int, text: str):
     url = "https://api.vk.com/method/messages.send"
     params = {
         "access_token": VK_TOKEN,
@@ -113,15 +115,8 @@ async def tilda_webhook(request: Request):
     data = dict(data)
     message = format_message(data)
 
-    results = {}
+    recipients = get_recipients()
+    for user_id in recipients:
+        send_vk_message(user_id, message)
 
-    # Отправляем в личку администратору
-    if VK_USER_ID:
-        results["personal"] = send_vk_message(VK_USER_ID, message)
-
-    # Отправляем в чат сотрудников
-    if VK_CHAT_PEER_ID:
-        results["chat"] = send_vk_message(VK_CHAT_PEER_ID, message)
-
-    print(f"VK responses: {results}")
-    return {"status": "ok", "vk_response": results}
+    return {"status": "ok", "sent_to": len(recipients)}

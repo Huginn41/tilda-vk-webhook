@@ -69,12 +69,12 @@ git clone https://github.com/ВАШ_НИК/tilda-vk-bot.git
 cd tilda-vk-bot
 ```
 
-### 2. Создай файл `.env`
-
-```env
-VK_TOKEN=твой_токен_сообщества_VK
-VK_RECIPIENTS=123456789,987654321
+### 2. Создай файл `.env` на основе примера
+```bash
+cp .env.example .env
 ```
+
+Заполни значения в `.env`
 
 Где:
 - `VK_TOKEN` — токен сообщества VK (Управление → Работа с API → Создать ключ)

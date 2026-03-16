@@ -3,7 +3,7 @@ import os
 import random
 import re
 import requests
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,6 +12,7 @@ app = FastAPI()
 
 VK_TOKEN = os.getenv("VK_TOKEN")
 VK_RECIPIENTS = os.getenv("VK_RECIPIENTS", "")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 PAYMENT_METHODS = {
     "cash": "Наличные",
@@ -111,6 +112,11 @@ def send_vk_message(peer_id: int, text: str):
 
 @app.post("/webhook")
 async def tilda_webhook(request: Request):
+    # Проверка секретного ключа
+    secret = request.headers.get("X-Webhook-Secret", "")
+    if WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     data = await request.form()
     data = dict(data)
     message = format_message(data)

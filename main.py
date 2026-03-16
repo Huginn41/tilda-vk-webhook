@@ -123,4 +123,5 @@ async def tilda_webhook(request: Request):
     if VK_CHAT_PEER_ID:
         results["chat"] = send_vk_message(VK_CHAT_PEER_ID, message)
 
+    print(f"VK responses: {results}")
     return {"status": "ok", "vk_response": results}

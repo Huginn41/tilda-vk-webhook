@@ -112,7 +112,6 @@ def send_vk_message(peer_id: int, text: str):
 
 @app.post("/webhook")
 async def tilda_webhook(request: Request):
-    # Проверка секретного ключа
     secret = request.headers.get("X-Webhook-Secret", "")
     if WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -122,7 +121,9 @@ async def tilda_webhook(request: Request):
     message = format_message(data)
 
     recipients = get_recipients()
+    results = []
     for user_id in recipients:
-        send_vk_message(user_id, message)
+        result = send_vk_message(user_id, message)
+        results.append({"user_id": user_id, "response": result})
 
-    return {"status": "ok", "sent_to": len(recipients)}
+    return {"status": "ok", "sent_to": len(recipients), "details": results}
